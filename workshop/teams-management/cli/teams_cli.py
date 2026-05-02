@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/workspaces/pe-architect-course/workshop/teams-management/cli/venv/bin/python3
 """
 Teams CLI - A simple command-line interface for the Teams API
 """
