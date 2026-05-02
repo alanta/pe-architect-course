@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Dict
 import uuid
 from datetime import datetime
@@ -27,6 +27,12 @@ teams_store: Dict[str, Dict] = {}
 class TeamCreate(BaseModel):
     name: str
 
+    @validator('name')
+    def name_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('name must not be empty')
+        return v.strip()
+
 class Team(BaseModel):
     id: str
     name: str
@@ -36,7 +42,7 @@ class Team(BaseModel):
 async def root():
     return {"message": "Teams API is running"}
 
-@app.post("/teams", response_model=Team)
+@app.post("/teams", response_model=Team, status_code=201)
 async def create_team(team: TeamCreate):
     """Create a new team"""
     # Check if team name already exists
