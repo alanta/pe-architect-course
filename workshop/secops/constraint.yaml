@@ -18,6 +18,7 @@ spec:
     exemptImages:
       - "registry.k8s.io/"    # Kubernetes system images (e.g., kube-proxy, coredns)
       - "gcr.io/distroless/"  # Google distroless base images (minimal, no shell)
+      - "curlimages/curl"      # Example of a specific image that may require root for functionality (customize as needed)
     exemptUsers:
       - "1000"   # Common non-root user UID used in workshop deployments (e.g., deployment-works.yaml)
       - "65534"  # 'nobody' user — standard unprivileged UID used by many minimal container images

@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: falcosidekick
+  namespace: falco-system
+  labels:
+    release: grafana-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: falcosidekick
+  namespaceSelector:
+    matchNames:
+      - falco-system
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

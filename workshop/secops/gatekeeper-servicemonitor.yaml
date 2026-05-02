@@ -1,0 +1,38 @@
+---
+# Expose Gatekeeper's metrics port (8888) as a scrape-able Service.
+# Both the audit and controller-manager pods expose metrics on 8888.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gatekeeper-metrics
+  namespace: gatekeeper-system
+  labels:
+    app: gatekeeper
+    release: grafana-stack
+spec:
+  selector:
+    gatekeeper.sh/system: "yes"
+  ports:
+    - name: metrics
+      port: 8888
+      targetPort: 8888
+      protocol: TCP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gatekeeper
+  namespace: gatekeeper-system
+  labels:
+    release: grafana-stack
+spec:
+  selector:
+    matchLabels:
+      app: gatekeeper
+  namespaceSelector:
+    matchNames:
+      - gatekeeper-system
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

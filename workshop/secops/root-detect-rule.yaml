@@ -27,7 +27,8 @@
 - macro: user_known_root_container_exceptions
   condition: >
     (container.image.repository in (root_container_exceptions)) or
-    (k8s.ns.name in ("kube-system", "kube-public", "falco-system"))
+    (k8s.ns.name in ("kube-system", "kube-public", "falco-system")) or
+    (k8s.ns.name = null)
 
 # Additional rule for detecting root process execution in non-system namespaces
 - rule: Root Process in User Namespace
