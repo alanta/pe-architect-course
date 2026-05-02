@@ -85,6 +85,9 @@ cd teams-management/teams-api
 # Build your own container image
 docker build -t teams-api:local .
 
+# Load the image into the cluster
+kind load docker-image teams-api:local --name 5min-idp
+
 # Deploy with local image
 kubectl apply -f deployment.yaml
 # (Modify deployment to use teams-api:local)
