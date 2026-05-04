@@ -1,11 +1,10 @@
-# Dockerfile
 FROM node:18-alpine as build
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -13,8 +12,8 @@ COPY . .
 # Build the app for production
 RUN npm run build:prod
 
-# Use nginx to serve the app
-FROM nginx:alpine
+# Use unprivileged nginx to serve the app (runs as uid 101, not root)
+FROM nginxinc/nginx-unprivileged:alpine
 
 # Copy built app to nginx
 COPY --from=build /app/dist/teams-ui /usr/share/nginx/html
@@ -22,6 +21,6 @@ COPY --from=build /app/dist/teams-ui /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]

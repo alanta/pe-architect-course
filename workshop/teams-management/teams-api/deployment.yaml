@@ -89,7 +89,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: teams-api.127.0.0.1.sslip.io
+  - host: teams-api.localhost
     http:
       paths:
       - path: /

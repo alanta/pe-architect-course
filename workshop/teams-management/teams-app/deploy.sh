@@ -14,8 +14,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 NAMESPACE="engineering-platform"
-UI_IMAGE="teams-ui:latest"
-API_IMAGE="teams-api:latest"
+UI_IMAGE="teams-ui:local"
+KIND_CLUSTER="5min-idp"
 
 # Functions
 log_info() {
@@ -82,7 +82,7 @@ build_ui() {
     log_success "Angular application built successfully"
 }
 
-# Build Docker images
+# Build Docker images and load into Kind
 build_images() {
     log_info "Building Docker images..."
 
@@ -90,15 +90,13 @@ build_images() {
     log_info "Building UI Docker image..."
     docker build -t $UI_IMAGE .
 
-    # Build API image (assuming API Dockerfile exists)
-    if [ -f "api.Dockerfile" ]; then
-        log_info "Building API Docker image..."
-        docker build -f api.Dockerfile -t $API_IMAGE .
-    else
-        log_warning "API Dockerfile not found. Make sure API image is available"
-    fi
+    log_success "Docker image built successfully"
 
-    log_success "Docker images built successfully"
+    # Load into Kind so nodes can pull it
+    log_info "Loading image into Kind cluster '$KIND_CLUSTER'..."
+    kind load docker-image $UI_IMAGE --name $KIND_CLUSTER
+
+    log_success "Image loaded into Kind"
 }
 
 # Deploy to Kubernetes
@@ -111,6 +109,9 @@ deploy_k8s() {
 
     # Apply Kubernetes manifests
     kubectl apply -f k8s/
+
+    # Patch the image to match UI_IMAGE (handles --image override and local builds)
+    kubectl set image deployment/teams-ui teams-ui=$UI_IMAGE -n $NAMESPACE
 
     log_success "Kubernetes resources deployed"
 
@@ -176,9 +177,31 @@ deploy() {
 }
 
 # Parse command line arguments
-case "${1:-deploy}" in
+# Optional: --image <name> overrides UI_IMAGE for any subcommand
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --image)
+            UI_IMAGE="$2"
+            shift 2
+            ;;
+        *)
+            COMMAND="${1:-deploy}"
+            shift
+            ;;
+    esac
+done
+COMMAND="${COMMAND:-deploy}"
+
+case "$COMMAND" in
     "deploy")
         deploy
+        ;;
+    "deploy-only")
+        log_info "Skipping build — deploying image: $UI_IMAGE"
+        check_kubectl
+        deploy_k8s
+        check_status
+        log_success "Deployment completed successfully! 🎉"
         ;;
     "rollback")
         rollback
@@ -194,12 +217,16 @@ case "${1:-deploy}" in
         build_images
         ;;
     *)
-        echo "Usage: $0 {deploy|rollback|cleanup|status|build}"
-        echo "  deploy   - Full deployment (default)"
-        echo "  rollback - Rollback to previous version"
-        echo "  cleanup  - Remove all resources"
-        echo "  status   - Check deployment status"
-        echo "  build    - Build application and images only"
+        echo "Usage: $0 [--image <image:tag>] {deploy|deploy-only|rollback|cleanup|status|build}"
+        echo "  deploy       - Full deployment (default): build, load into Kind, deploy"
+        echo "  deploy-only  - Deploy without building (uses existing local or remote image)"
+        echo "  rollback     - Rollback to previous version"
+        echo "  cleanup      - Remove all resources"
+        echo "  status       - Check deployment status"
+        echo "  build        - Build application and images only"
+        echo ""
+        echo "Options:"
+        echo "  --image <image:tag>  Override the image used for deployment (default: $UI_IMAGE)"
         exit 1
         ;;
 esac

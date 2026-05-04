@@ -7,8 +7,10 @@ metadata:
   labels:
     app: teams-api
     component: backend
+  annotations:
+    commit-sha: 8b514a1cb354
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: teams-api
@@ -18,9 +20,26 @@ spec:
         app: teams-api
         component: backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: teams-api
-        image: teams-api:latest
+        image: teams-api:local
+        imagePullPolicy: Never
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
         ports:
         - containerPort: 8000
         env:

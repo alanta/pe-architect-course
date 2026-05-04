@@ -1,9 +1,6 @@
 import { KeycloakConfig } from 'keycloak-js';
+import { environment } from '../../environments/environment';
 
-const keycloakConfig: KeycloakConfig = {
-  url: 'http://platform-auth.127.0.0.1.sslip.io',
-  realm: 'teams',
-  clientId: 'teams-ui',
-};
+const keycloakConfig: KeycloakConfig = environment.keycloak;
 
 export default keycloakConfig;

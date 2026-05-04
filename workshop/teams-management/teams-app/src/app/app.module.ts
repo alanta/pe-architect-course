@@ -18,10 +18,12 @@ function initializeKeycloak(keycloak: KeycloakService) {
       config: keycloakConfig,
       initOptions: {
         onLoad: 'check-sso',
-        silentCheckSsoRedirectUri: window.location.origin + '/assets/silent-check-sso.html',
         checkLoginIframe: false,
+        redirectUri: window.location.origin + '/',
       },
       bearerExcludedUrls: ['/assets'],
+    }).catch(() => {
+      console.warn('Keycloak unavailable — running without authentication');
     });
 }
 

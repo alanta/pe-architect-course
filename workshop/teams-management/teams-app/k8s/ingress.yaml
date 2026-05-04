@@ -34,12 +34,11 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: teams-ui-ingress
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-    kubernetes.io/ingress.class: traefik
+  namespace: engineering-platform
 spec:
+  ingressClassName: nginx
   rules:
-  - host: teams-ui.127.0.0.1.sslip.io
+  - host: teams-ui.localhost
     http:
       paths:
       - path: /
