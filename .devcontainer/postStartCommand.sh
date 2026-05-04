@@ -18,3 +18,17 @@ if ! grep -q "alias k='kubectl'" "$HOME/.bashrc"; then
   echo "alias h='humctl'" >> "$HOME/.bashrc"
   echo "alias sk='score-k8s'" >> "$HOME/.bashrc"
 fi
+
+# Add *.localhost entries so Python's DNS resolver can reach cluster services.
+# curl resolves these fine but Python's socket module does not handle *.localhost subdomains.
+LOCALHOST_HOSTS=(
+  "teams-api.localhost"
+  "teams-ui.localhost"
+  "platform-auth.localhost"
+  "rollouts-demo.localhost"
+)
+for host in "${LOCALHOST_HOSTS[@]}"; do
+  if ! grep -q "$host" /etc/hosts; then
+    echo "127.0.0.1 $host" | sudo tee -a /etc/hosts > /dev/null
+  fi
+done

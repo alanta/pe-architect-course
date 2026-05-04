@@ -6,10 +6,11 @@ Teams CLI - A simple command-line interface for the Teams API
 import argparse
 import json
 import sys
+import os
 import requests
 from typing import Optional
 
-API_BASE_URL = "http://teams-api.localhost:8080"
+API_BASE_URL = os.environ.get("TEAMS_API_URL", "http://teams-api.localhost:8080")
 
 class TeamsAPI:
     def __init__(self, base_url: str = API_BASE_URL):
