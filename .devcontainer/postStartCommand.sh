@@ -3,6 +3,10 @@
 # Runs on every workspace start. Idempotently ensures bash completion and aliases
 # are present in .bashrc so they survive workspace restarts.
 
+if ! grep -q "bash_completion" "$HOME/.bashrc"; then
+  echo "source /usr/share/bash-completion/bash_completion" >> "$HOME/.bashrc"
+fi
+
 if ! grep -q "kubectl completion bash" "$HOME/.bashrc"; then
   echo "source <(kubectl completion bash)" >> "$HOME/.bashrc"
   echo "complete -F __start_kubectl k" >> "$HOME/.bashrc"
