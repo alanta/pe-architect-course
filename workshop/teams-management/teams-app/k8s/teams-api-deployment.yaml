@@ -1,12 +1,10 @@
-# k8s/teams-api-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: teams-api
-  namespace: engineering-platform
+  namespace: teams-api
   labels:
     app: teams-api
-    component: backend
   annotations:
     commit-sha: 8b514a1cb354
 spec:
@@ -18,7 +16,6 @@ spec:
     metadata:
       labels:
         app: teams-api
-        component: backend
     spec:
       securityContext:
         runAsNonRoot: true
@@ -31,6 +28,11 @@ spec:
       - name: teams-api
         image: teams-api:local
         imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
         securityContext:
           runAsNonRoot: true
           runAsUser: 1001
@@ -40,20 +42,15 @@ spec:
           capabilities:
             drop:
             - ALL
-        ports:
-        - containerPort: 8000
-        env:
-        - name: HOST
-          value: "0.0.0.0"
-        - name: PORT
-          value: "8000"
+          seccompProfile:
+            type: RuntimeDefault
         resources:
           requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
             memory: "128Mi"
             cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "200m"
         livenessProbe:
           httpGet:
             path: /health

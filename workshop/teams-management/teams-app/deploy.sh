@@ -110,14 +110,15 @@ deploy_k8s() {
     # Apply Kubernetes manifests
     kubectl apply -f k8s/
 
-    # Patch the image to match UI_IMAGE (handles --image override and local builds)
+    # Patch the UI image to match UI_IMAGE (handles --image override and local builds)
     kubectl set image deployment/teams-ui teams-ui=$UI_IMAGE -n $NAMESPACE
 
     log_success "Kubernetes resources deployed"
 
     # Wait for deployments to be ready
     log_info "Waiting for deployments to be ready..."
-    kubectl wait --for=condition=available --timeout=300s deployment/teams-ui deployment/teams-api -n $NAMESPACE
+    kubectl wait --for=condition=available --timeout=300s deployment/teams-ui -n $NAMESPACE
+    kubectl wait --for=condition=available --timeout=300s deployment/teams-api -n teams-api
 
     log_success "Deployments are ready"
 }

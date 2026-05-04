@@ -68,10 +68,11 @@ spec:
           type: RuntimeDefault
       containers:
       - name: teams-operator
-        image: olivercodes01/teams-operator:0.0.1
+        image: teams-operator:local
+        imagePullPolicy: Never # Use local image built in the cluster
         env:
         - name: TEAMS_API_URL
-          value: "http://teams-api-service.engineering-platform.svc.cluster.local:4200"
+          value: "http://teams-api-service.teams-api.svc.cluster.local:4200"
         - name: POLL_INTERVAL
           value: "30"
         securityContext:
@@ -95,16 +96,24 @@ spec:
         livenessProbe:
           exec:
             command:
-            - python
+            - python3
             - -c
-            - "import sys; sys.exit(0)"
-          initialDelaySeconds: 30
+            - "import os,time,sys; age=time.time()-os.path.getmtime('/tmp/operator-heartbeat'); sys.exit(0 if age<60 else 1)"
+          initialDelaySeconds: 35
           periodSeconds: 30
+          failureThreshold: 3
         readinessProbe:
           exec:
             command:
-            - python
+            - python3
             - -c
-            - "import sys; sys.exit(0)"
+            - "import os,time,sys; age=time.time()-os.path.getmtime('/tmp/operator-heartbeat'); sys.exit(0 if age<60 else 1)"
           initialDelaySeconds: 5
           periodSeconds: 10
+          failureThreshold: 3
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}

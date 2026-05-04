@@ -8,7 +8,10 @@ import json
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Set, Dict, Any
+
+HEARTBEAT_FILE = Path('/tmp/operator-heartbeat')
 import aiohttp
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -81,13 +84,18 @@ class TeamsOperator:
         """Create a Kubernetes namespace for the team"""
         try:
             # Define namespace metadata
+            # Label values must match: (([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?
+            safe_label = ''.join(c if c.isalnum() or c in '-_.' else '-' for c in team_name.lower())
+            safe_label = '-'.join(filter(None, safe_label.split('-'))).strip('-.')
+            safe_label = safe_label[:63] if safe_label else 'unknown'
+
             namespace_body = client.V1Namespace(
                 metadata=client.V1ObjectMeta(
                     name=namespace_name,
                     labels={
                         "app.kubernetes.io/managed-by": "teams-operator",
                         "teams.example.com/team-id": team_id,
-                        "teams.example.com/team-name": team_name.replace(" ", "-").lower()
+                        "teams.example.com/team-name": safe_label
                     },
                     annotations={
                         "teams.example.com/original-team-name": team_name,
@@ -135,31 +143,47 @@ class TeamsOperator:
         teams = await self.fetch_teams()
         current_teams = {team['id']: team for team in teams}
         current_team_ids = set(current_teams.keys())
-        
+
+        # Get actually existing namespaces managed by this operator
+        try:
+            ns_list = self.k8s_core_v1.list_namespace(
+                label_selector="app.kubernetes.io/managed-by=teams-operator"
+            )
+            existing_namespaces = {ns.metadata.name for ns in ns_list.items}
+        except Exception as e:
+            logger.error(f"❌ Failed to list namespaces: {e}")
+            existing_namespaces = set(self.team_namespaces.values())
+
         # Handle new teams (create namespaces)
         new_teams = current_team_ids - self.known_teams
         for team_id in new_teams:
             team = current_teams[team_id]
             team_name = team['name']
             namespace_name = self.sanitize_namespace_name(team_name)
-            
+
             if self.create_namespace(team_id, team_name, namespace_name):
                 self.team_namespaces[team_id] = namespace_name
-        
+
         # Handle deleted teams (remove namespaces)
         deleted_teams = self.known_teams - current_team_ids
         for team_id in deleted_teams:
             if team_id in self.team_namespaces:
                 namespace_name = self.team_namespaces[team_id]
-                # Get team name from namespace annotations if possible
                 team_name = f"team-{team_id}"  # fallback
-                
                 if self.delete_namespace(namespace_name, team_name):
                     del self.team_namespaces[team_id]
-        
+
+        # Recreate namespaces that exist in API but were manually deleted from cluster
+        for team_id, namespace_name in self.team_namespaces.items():
+            if namespace_name not in existing_namespaces:
+                team = current_teams.get(team_id)
+                if team:
+                    logger.warning(f"⚠️ Namespace '{namespace_name}' missing from cluster, recreating...")
+                    self.create_namespace(team_id, team['name'], namespace_name)
+
         # Update known teams
         self.known_teams = current_team_ids
-        
+
         if new_teams or deleted_teams:
             logger.info(f"📊 Reconciliation complete: {len(current_teams)} teams, {len(self.team_namespaces)} namespaces")
     
@@ -172,17 +196,23 @@ class TeamsOperator:
         # Initial reconciliation
         await self.reconcile_teams()
         
+        # Write initial heartbeat so the readiness probe passes quickly
+        HEARTBEAT_FILE.touch()
+
         # Main loop
         while True:
             try:
                 await asyncio.sleep(self.poll_interval)
                 await self.reconcile_teams()
-            except KeyboardInterrupt:
+                HEARTBEAT_FILE.touch()
+            except (KeyboardInterrupt, asyncio.CancelledError):
                 logger.info("👋 Received shutdown signal, exiting...")
                 break
             except Exception as e:
-                logger.error(f"❌ Error in main loop: {e}")
-                await asyncio.sleep(self.poll_interval)
+                logger.error(f"❌ Error in main loop: {e}", exc_info=True)
+            except BaseException as e:
+                logger.error(f"❌ Fatal error in main loop ({type(e).__name__}): {e}", exc_info=True)
+                raise
 
 async def main():
     """Entry point"""
