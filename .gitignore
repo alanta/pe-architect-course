@@ -2,3 +2,5 @@ venv/
 .terraform/
 node_modules/
 .angular/
+dist/
+
