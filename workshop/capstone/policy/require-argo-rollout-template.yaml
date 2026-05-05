@@ -1,0 +1,21 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequireargorollout
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequireArgoRollout
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequireargollout
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Deployment"
+          msg := sprintf(
+            "Deployments are not allowed in team namespaces. Use an Argo Rollout instead (namespace: %v, name: %v).",
+            [input.review.object.metadata.namespace, input.review.object.metadata.name]
+          )
+        }

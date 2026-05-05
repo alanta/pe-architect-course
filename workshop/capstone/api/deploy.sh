@@ -8,12 +8,14 @@ NAMESPACE_WAIT_TIMEOUT="${NAMESPACE_WAIT_TIMEOUT:-90}"  # max seconds to wait fo
 VALID_COLORS=(purple green orange)
 
 usage() {
-    echo "Usage: $0 --team <team-name> --color <purple|green|orange>"
+    echo "Usage: $0 --team <team-name> --color <purple|green|orange> [--good]"
     echo ""
     echo "  --team   Name of the team (must already exist via the Teams API)"
     echo "  --color  Emoji color variant to deploy"
+    echo "  --good   Use deployment.good.yaml instead of deployment.yaml"
     echo ""
     echo "Example: $0 --team 'Platform Engineering' --color purple"
+    echo "Example: $0 --team 'Platform Engineering' --color purple --good"
     exit 1
 }
 
@@ -41,10 +43,12 @@ wait_for_namespace() {
 # Parse args
 TEAM_NAME=""
 COLOR=""
+USE_GOOD="false"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --team)  TEAM_NAME="$2"; shift 2 ;;
         --color) COLOR="$2";     shift 2 ;;
+        --good)  USE_GOOD="true"; shift ;;
         -h|--help) usage ;;
         *) log_error "Unknown argument: $1" ;;
     esac
@@ -100,12 +104,18 @@ else
 fi
 
 # Apply resources
-log_info "Deploying to namespace '$NAMESPACE'..."
-envsubst < "${SCRIPT_DIR}/k8s/deployment.yaml" | kubectl apply -f -
+DEPLOYMENT_FILE="deployment.yaml"
+[[ "$USE_GOOD" == "true" ]] && DEPLOYMENT_FILE="deployment.good.yaml"
+log_info "Deploying to namespace '$NAMESPACE' (using $DEPLOYMENT_FILE)..."
+envsubst < "${SCRIPT_DIR}/k8s/${DEPLOYMENT_FILE}" | kubectl apply -f -
 
 # Wait for rollout
 log_info "Waiting for rollout..."
-kubectl rollout status deployment/emoji-api -n "$NAMESPACE" --timeout=120s
+if [[ "$USE_GOOD" == "true" ]]; then
+    kubectl argo rollouts status emoji-api -n "$NAMESPACE" --timeout 120s
+else
+    kubectl rollout status deployment/emoji-api -n "$NAMESPACE" --timeout=120s
+fi
 
 log_success "emoji-api:${COLOR} deployed to $NAMESPACE"
 log_success "Reachable at: http://${NAMESPACE}.localhost:8080"

@@ -9,6 +9,7 @@
 # Grafana              monitoring             3000  → 80
 # Prometheus           monitoring             9090  → 9090
 # AlertManager         monitoring             9093  → 9093
+# Argo Rollouts UI     (local CLI dashboard)  3100
 
 set -euo pipefail
 
@@ -44,10 +45,19 @@ start_forward() {
 echo "Starting development port-forwards..."
 echo ""
 
-start_forward "Nginx Ingress"  ingress-nginx  svc/ingress-nginx-controller  8080:80
-start_forward "Grafana"        monitoring      svc/grafana-stack             3000:80
-start_forward "Prometheus"     monitoring      svc/prometheus-operated       9090:9090
-start_forward "AlertManager"   monitoring      svc/alertmanager-operated     9093:9093
+start_forward "Nginx Ingress"      ingress-nginx  svc/ingress-nginx-controller          8080:80
+start_forward "Grafana"            monitoring     svc/grafana-stack                     3000:80
+start_forward "Prometheus"         monitoring     svc/prometheus-operated               9090:9090
+start_forward "AlertManager"       monitoring     svc/alertmanager-operated             9093:9093
+
+# Argo Rollouts dashboard is a local CLI server, not a k8s service
+if command -v kubectl-argo-rollouts &>/dev/null || kubectl argo rollouts version &>/dev/null 2>&1; then
+  kubectl argo rollouts dashboard &>/dev/null &
+  PIDS+=("$!")
+  echo "[OK]   Argo Rollouts UI  →  http://localhost:3100"
+else
+  echo "[SKIP] Argo Rollouts UI (kubectl-argo-rollouts plugin not installed)"
+fi
 
 echo ""
 echo "All port-forwards running. Press Ctrl+C to stop."
@@ -55,9 +65,10 @@ echo ""
   echo "  Teams UI     http://teams-ui.localhost:8080"
   echo "  Teams API    http://teams-api.localhost:8080"
   echo "  Keycloak     http://platform-auth.localhost:8080"
-echo "  Grafana      http://localhost:3000   (admin / admin123)"
-echo "  Prometheus   http://localhost:9090"
-echo "  AlertManager http://localhost:9093"
+echo "  Grafana          http://localhost:3000   (admin / admin123)"
+echo "  Prometheus       http://localhost:9090"
+echo "  AlertManager     http://localhost:9093"
+echo "  Argo Rollouts UI http://localhost:3100"
 echo ""
 
 # Wait until interrupted

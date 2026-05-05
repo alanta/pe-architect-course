@@ -1,0 +1,14 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequireArgoRollout
+metadata:
+  name: require-argo-rollout-in-team-namespaces
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment"]
+    namespaceSelector:
+      matchExpressions:
+        - key: teams.example.com/team-name
+          operator: Exists
