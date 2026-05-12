@@ -1,3 +1,59 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: teams-api
+  namespace: teams-api
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: teams-api
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events", "namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["argoproj.io"]
+  resources: ["rollouts"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["constraints.gatekeeper.sh"]
+  resources: ["*"]
+  verbs: ["get", "list"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: teams-api
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: teams-api
+subjects:
+- kind: ServiceAccount
+  name: teams-api
+  namespace: teams-api
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teams-api-data
+  namespace: teams-api
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,6 +73,7 @@ spec:
       labels:
         app: teams-api
     spec:
+      serviceAccountName: teams-api
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
@@ -24,14 +81,29 @@ spec:
         fsGroup: 1001
         seccompProfile:
           type: RuntimeDefault
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: teams-api-data
       containers:
       - name: teams-api
         image: teams-api:local
         ports:
         - containerPort: 8000
+        volumeMounts:
+        - name: data
+          mountPath: /data
         env:
         - name: PORT
           value: "8000"
+        - name: DATABASE_PATH
+          value: /data/teams.db
+        - name: GRAFANA_BASE_URL
+          value: "http://localhost:3000"
+        - name: GRAFANA_DASHBOARD_PATH
+          value: "/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-workloads"
+        - name: ARGO_ROLLOUTS_BASE_URL
+          value: "http://localhost:3100"
         securityContext:
           runAsNonRoot: true
           runAsUser: 1001
@@ -45,11 +117,11 @@ spec:
             type: RuntimeDefault
         resources:
           requests:
-            memory: "64Mi"
+            memory: "128Mi"
             cpu: "50m"
           limits:
-            memory: "128Mi"
-            cpu: "100m"
+            memory: "256Mi"
+            cpu: "200m"
         livenessProbe:
           httpGet:
             path: /health

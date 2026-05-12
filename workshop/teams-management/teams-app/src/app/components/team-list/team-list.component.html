@@ -29,6 +29,7 @@
         <p class="team-id">ID: {{ team.id }}</p>
         <p class="team-created">Created: {{ formatDate(team.created_at) }}</p>
       </div>
+      <app-event-feed [teamId]="team.id"></app-event-feed>
     </div>
   </div>
 

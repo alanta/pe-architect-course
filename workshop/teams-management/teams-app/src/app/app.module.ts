@@ -8,6 +8,7 @@ import { AppComponent } from './app.component';
 import { TeamFormComponent } from './components/team-form/team-form.component';
 import { TeamListComponent } from './components/team-list/team-list.component';
 import { HeaderComponent } from './components/header/header.component';
+import { EventFeedComponent } from './components/event-feed/event-feed.component';
 
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 import keycloakConfig from './config/keycloak.config';
@@ -32,7 +33,8 @@ function initializeKeycloak(keycloak: KeycloakService) {
     AppComponent,
     TeamFormComponent,
     TeamListComponent,
-    HeaderComponent
+    HeaderComponent,
+    EventFeedComponent,
   ],
   imports: [
     BrowserModule,

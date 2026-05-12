@@ -1,0 +1,124 @@
+.event-feed {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ecf0f1;
+}
+
+.event-feed-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #95a5a6;
+  margin: 0 0 8px 0;
+}
+
+.event-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  font-size: 13px;
+  background: #f8f9fa;
+}
+
+/* severity colours (task 9.5) */
+.severity-info {
+  border-left-color: #3498db;
+  background: #eaf4fb;
+}
+
+.severity-warning {
+  border-left-color: #f39c12;
+  background: #fef9ec;
+}
+
+.severity-error {
+  border-left-color: #e74c3c;
+  background: #fdf0ef;
+}
+
+.event-icon {
+  font-size: 14px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.severity-info .event-icon    { color: #2980b9; }
+.severity-warning .event-icon { color: #e67e22; }
+.severity-error .event-icon   { color: #c0392b; }
+
+.event-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.event-type {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7f8c8d;
+}
+
+.event-message {
+  color: #2c3e50;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-time {
+  font-size: 11px;
+  color: #95a5a6;
+}
+
+.event-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+}
+
+.event-link-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #dde8f0;
+  color: #2471a3;
+  font-size: 11px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.event-link-chip:hover {
+  background: #aed6f1;
+  color: #154360;
+}
+
+.event-feed-empty {
+  border-top-color: transparent;
+  padding-top: 0;
+  margin-top: 8px;
+}
+
+.event-feed-empty-text {
+  font-size: 12px;
+  color: #bdc3c7;
+  font-style: italic;
+}

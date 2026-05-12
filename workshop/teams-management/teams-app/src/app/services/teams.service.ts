@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { Team, TeamCreate } from '../models/team.model';
+import { Team, TeamCreate, Event } from '../models/team.model';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 
@@ -37,8 +37,14 @@ export class TeamsService {
   deleteTeam(teamId: string): Observable<any> {
     const url = `${this.apiUrl}/teams/${teamId}`;
     console.log('🗑️ Deleting team via API:', url);
-    
+
     return this.http.delete(url)
+      .pipe(catchError(this.handleError));
+  }
+
+  getTeamEvents(teamId: string, limit: number = 5): Observable<Event[]> {
+    const url = `${this.apiUrl}/teams/${teamId}/events?limit=${limit}`;
+    return this.http.get<Event[]>(url)
       .pipe(catchError(this.handleError));
   }
 

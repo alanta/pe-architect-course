@@ -8,3 +8,20 @@ export interface Team {
 export interface TeamCreate {
   name: string;
 }
+
+export interface EventLink {
+  label: string;
+  url: string;
+}
+
+export interface Event {
+  id: string;
+  team_id: string;
+  event_type: string;
+  severity: 'info' | 'warning' | 'error';
+  resource: string;
+  namespace: string;
+  message: string;
+  timestamp: string;
+  links: EventLink[];
+}
