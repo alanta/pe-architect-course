@@ -88,6 +88,18 @@
   margin-top: 2px;
 }
 
+.event-count {
+  flex-shrink: 0;
+  align-self: flex-start;
+  background: #bdc3c7;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
 .event-links {
   display: flex;
   flex-wrap: wrap;

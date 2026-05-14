@@ -477,6 +477,7 @@ class Event(BaseModel):
     message: str
     timestamp: datetime
     links: List[EventLink]
+    count: int = 1
 
 
 class EventCreate(BaseModel):
@@ -579,13 +580,30 @@ async def get_team_events(
 
         if since:
             cursor = await db.execute(
-                "SELECT * FROM events WHERE team_id = ? AND timestamp > ?"
-                " ORDER BY timestamp DESC LIMIT ?",
+                """
+                SELECT MIN(id) as id, team_id, event_type, severity, resource, namespace,
+                       message, MAX(timestamp) as timestamp,
+                       links, COUNT(*) as count
+                FROM events
+                WHERE team_id = ? AND timestamp > ?
+                GROUP BY event_type, message, namespace
+                ORDER BY MAX(timestamp) DESC
+                LIMIT ?
+                """,
                 (team_id, since, limit),
             )
         else:
             cursor = await db.execute(
-                "SELECT * FROM events WHERE team_id = ? ORDER BY timestamp DESC LIMIT ?",
+                """
+                SELECT MIN(id) as id, team_id, event_type, severity, resource, namespace,
+                       message, MAX(timestamp) as timestamp,
+                       links, COUNT(*) as count
+                FROM events
+                WHERE team_id = ?
+                GROUP BY event_type, message, namespace
+                ORDER BY MAX(timestamp) DESC
+                LIMIT ?
+                """,
                 (team_id, limit),
             )
         rows = await cursor.fetchall()
@@ -601,6 +619,7 @@ async def get_team_events(
             message=row["message"],
             timestamp=row["timestamp"],
             links=json.loads(row["links"]),
+            count=row["count"],
         )
         for row in rows
     ]

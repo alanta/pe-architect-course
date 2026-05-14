@@ -14,6 +14,7 @@
         <span class="event-message">{{ displayMessage(event) }}</span>
         <span class="event-meta">{{ formatTime(event.timestamp) }} · {{ event.namespace }} · {{ displaySource(event) }}</span>
       </div>
+      <span class="event-count" *ngIf="event.count > 1">×{{ event.count }}</span>
       <div class="event-links" *ngIf="event.links.length > 0">
         <a
           *ngFor="let link of event.links"

@@ -24,4 +24,5 @@ export interface Event {
   message: string;
   timestamp: string;
   links: EventLink[];
+  count: number;
 }
