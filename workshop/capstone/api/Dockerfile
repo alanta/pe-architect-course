@@ -7,6 +7,7 @@ RUN dotnet restore EmojiApi.Tests/EmojiApi.Tests.csproj
 COPY EmojiApi/ EmojiApi/
 COPY EmojiApi.Tests/ EmojiApi.Tests/
 RUN dotnet test EmojiApi.Tests/EmojiApi.Tests.csproj \
+    --settings EmojiApi.Tests/coverlet.runsettings \
     --collect:"XPlat Code Coverage" \
     --results-directory /testresults \
     --no-restore \

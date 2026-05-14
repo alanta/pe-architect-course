@@ -58,8 +58,31 @@ else
     done
 fi
 
+# ---------------------------------------------------------------------------
+# Step 4: Build the red demo variant with a hardcoded low-coverage SHA
+# ---------------------------------------------------------------------------
+RED_DEMO_SHA="demo-low-cov"
+RED_DEMO_COVERAGE="35"
+
+echo "==> Building emoji-api:red (demo blocked variant)..."
+docker build \
+    --build-arg COLOR="red" \
+    -t "emoji-api:red" \
+    "${SCRIPT_DIR}"
+echo "==> Loading emoji-api:red into kind cluster '${KIND_CLUSTER}'..."
+kind load docker-image "emoji-api:red" --name "${KIND_CLUSTER}"
+
+if kubectl get configmap "${COVERAGE_CONFIGMAP}" -n "${COVERAGE_NAMESPACE}" &>/dev/null; then
+    echo "==> Registering demo low-coverage SHA ${RED_DEMO_SHA}=${RED_DEMO_COVERAGE}% in ConfigMap..."
+    kubectl patch configmap "${COVERAGE_CONFIGMAP}" \
+        -n "${COVERAGE_NAMESPACE}" \
+        --type merge \
+        -p "{\"data\":{\"${RED_DEMO_SHA}\":\"${RED_DEMO_COVERAGE}\"}}"
+fi
+
 echo ""
 echo "Built images:"
 for color in "${COLORS[@]}"; do
     echo "  emoji-api:${color}  (EMOJI_COLOR=${color})"
 done
+echo "  emoji-api:red  (EMOJI_COLOR=red) - low coverage demo variant"

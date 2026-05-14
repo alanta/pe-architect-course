@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEAMS_CLI="/workspaces/pe-architect-course/workshop/teams-management/cli/teams_cli.py"
 OPERATOR_POLL_INTERVAL="${OPERATOR_POLL_INTERVAL:-30}"  # seconds between operator reconciles
 NAMESPACE_WAIT_TIMEOUT="${NAMESPACE_WAIT_TIMEOUT:-90}"  # max seconds to wait for namespace
-VALID_COLORS=(purple green orange)
+VALID_COLORS=(purple green orange red)
 
 usage() {
     echo "Usage: $0 --team <team-name> --color <purple|green|orange> [--good]"
@@ -79,7 +79,12 @@ export COLOR
 export IMAGE="emoji-api:${COLOR}"
 export TEAM_NAME
 export COMMIT_SHA
-COMMIT_SHA="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+# Red is a demo variant with a known low-coverage SHA that will be blocked by the quality gate
+if [[ "${COLOR}" == "red" ]]; then
+    COMMIT_SHA="demo-low-cov"
+else
+    COMMIT_SHA="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+fi
 
 log_info "Team:      $TEAM_NAME"
 log_info "Namespace: $NAMESPACE"

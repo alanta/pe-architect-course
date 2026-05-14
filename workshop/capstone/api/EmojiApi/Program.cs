@@ -16,9 +16,10 @@ var color = (Environment.GetEnvironmentVariable("EMOJI_COLOR") ?? "green").ToLow
 
 var emojisByColor = new Dictionary<string, string[]>
 {
-    ["purple"] = ["💜", "🟣", "🪻", "🔮", "🍇", "🫐", "🦄", "🌸"],
+    ["purple"] = ["💜", "🟣", "🪻", "🔮", "🍇", "🫐", "☂️", "🟪"],
     ["green"]  = ["💚", "🟢", "🌿", "🍀", "🥑", "🐸", "🌱", "🦚"],
-    ["orange"] = ["🧡", "🟠", "🎃", "🦊", "🍊", "🔥", "🌅", "🦁"],
+    ["orange"] = ["🧡", "🟠", "🎃", "🦊", "🍊", "🔥", "🔶", "🦁"],
+    ["red"]    = ["❤️", "🔴", "🍎", "🌹", "♥️", "⛔️", "🚨", "🎈"],
 };
 
 if (!emojisByColor.ContainsKey(color))
@@ -52,6 +53,7 @@ app.MapGet("/", () =>
               justify-content: center;
               min-height: 100vh;
               font-family: 'Arial Black', 'Impact', sans-serif;
+              overflow: hidden;
             }
             h1 {
               color: {{displayColor}};
@@ -61,11 +63,40 @@ app.MapGet("/", () =>
               text-shadow: 0 0 40px {{displayColor}}88;
               letter-spacing: -0.02em;
               padding: 1rem;
+              position: relative;
+              z-index: 1;
+            }
+            .emoji-particle {
+              position: fixed;
+              font-size: clamp(1.5rem, 4vw, 3rem);
+              pointer-events: none;
+              user-select: none;
+              animation: fadeIn 0.3s ease-out forwards;
+            }
+            @keyframes fadeIn {
+              from { opacity: 0; transform: scale(0.5); }
+              to   { opacity: 1; transform: scale(1); }
             }
           </style>
         </head>
         <body>
           <h1>You get {{char.ToUpper(color[0]) + color[1..]}} emojis!</h1>
+          <script>
+            const max = 100;
+            let count = 0;
+            const interval = setInterval(async () => {
+              if (count >= max) { clearInterval(interval); return; }
+              const emoji = await fetch('/random').then(r => r.text()).catch(() => null);
+              if (!emoji) return;
+              const el = document.createElement('span');
+              el.className = 'emoji-particle';
+              el.textContent = emoji;
+              el.style.left = Math.random() * 100 + 'vw';
+              el.style.top  = Math.random() * 100 + 'vh';
+              document.body.appendChild(el);
+              count++;
+            }, 1000);
+          </script>
         </body>
         </html>
         """;
