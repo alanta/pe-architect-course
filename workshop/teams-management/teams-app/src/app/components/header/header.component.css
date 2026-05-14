@@ -1,8 +1,8 @@
 .header {
   background: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  padding: 20px 0;
-  margin-bottom: 40px;
+  padding: 12px 0;
+  margin-bottom: 24px;
 }
 
 .header-content {
@@ -12,24 +12,53 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .header-left h1 {
   color: #2c3e50;
-  font-size: 2rem;
+  font-size: 1.4rem;
   margin: 0;
+  white-space: nowrap;
 }
 
 .subtitle {
   color: #7f8c8d;
-  font-size: 1rem;
+  font-size: 0.85rem;
   margin: 0;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.create-team-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.create-input {
+  padding: 7px 10px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 160px;
+  transition: border-color 0.2s;
+}
+
+.create-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.create-error {
+  color: #e74c3c;
+  font-size: 12px;
 }
 
 .user-info {
@@ -39,33 +68,42 @@
 .welcome-text {
   color: #2c3e50;
   font-weight: 500;
+  font-size: 13px;
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 3px;
+  white-space: nowrap;
 }
 
 .user-roles {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .role-badge {
   background: #3498db;
   color: white;
-  padding: 2px 8px;
+  padding: 1px 7px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 
 .btn {
-  padding: 10px 20px;
+  padding: 8px 16px;
   border: none;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -73,7 +111,7 @@
   color: white;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background-color: #2980b9;
 }
 
@@ -89,15 +127,35 @@
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
-    gap: 15px;
-    text-align: center;
+    align-items: stretch;
+    gap: 10px;
   }
-  
+
+  .header-right {
+    justify-content: space-between;
+  }
+
+  .create-input {
+    width: 100%;
+    flex: 1;
+  }
+
   .user-info {
-    text-align: center;
+    text-align: left;
   }
-  
+
   .user-roles {
-    justify-content: center;
+    justify-content: flex-start;
   }
 }
+
+.role-badge {
+  background: #3498db;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+

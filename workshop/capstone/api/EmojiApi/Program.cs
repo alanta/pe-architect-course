@@ -98,3 +98,6 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", color }))
 .ExcludeFromDescription();
 
 app.Run();
+
+// Needed for WebApplicationFactory<Program> in integration tests
+public partial class Program { }

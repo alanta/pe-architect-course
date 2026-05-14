@@ -5,19 +5,11 @@
 </div>
 
 <div *ngIf="!isLoading">
-  <app-header></app-header>
+  <app-header (teamCreated)="onTeamCreated()"></app-header>
 
   <div class="container" *ngIf="isLoggedIn">
     <main class="main-content" *ngIf="authService.hasRole('team-leader')">
-      <div class="form-section">
-        <h2>Create New Team</h2>
-        <app-team-form (teamCreated)="teamList.loadTeams()"></app-team-form>
-      </div>
-
-      <div class="list-section">
-        <h2>Existing Teams</h2>
-        <app-team-list #teamList></app-team-list>
-      </div>
+      <app-team-list #teamList></app-team-list>
     </main>
 
     <div class="access-denied" *ngIf="!authService.hasRole('team-leader')">

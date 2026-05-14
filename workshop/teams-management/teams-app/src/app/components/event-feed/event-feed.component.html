@@ -11,9 +11,8 @@
     >
       <span class="event-icon" [title]="event.severity">{{ eventIcon(event.severity) }}</span>
       <div class="event-body">
-        <span class="event-type">{{ event.event_type }}</span>
-        <span class="event-message">{{ event.message }}</span>
-        <span class="event-time">{{ formatTime(event.timestamp) }}</span>
+        <span class="event-message">{{ displayMessage(event) }}</span>
+        <span class="event-meta">{{ formatTime(event.timestamp) }} · {{ event.namespace }} · {{ displaySource(event) }}</span>
       </div>
       <div class="event-links" *ngIf="event.links.length > 0">
         <a

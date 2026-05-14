@@ -6,6 +6,23 @@
     </div>
 
     <div class="header-right" *ngIf="isLoggedIn">
+      <div class="create-team-form" *ngIf="canManageTeams">
+        <input
+          type="text"
+          class="create-input"
+          placeholder="New team name"
+          [(ngModel)]="newTeamName"
+          (keyup.enter)="createTeam()"
+          [disabled]="isSubmitting"
+        />
+        <button
+          class="btn btn-primary"
+          (click)="createTeam()"
+          [disabled]="!newTeamName.trim() || isSubmitting"
+        >{{ isSubmitting ? '...' : 'Add' }}</button>
+        <span class="create-error" *ngIf="createError">{{ createError }}</span>
+      </div>
+
       <div class="user-info">
         <span class="welcome-text">
           Welcome, {{ userProfile?.firstName || userProfile?.username }}!
@@ -16,9 +33,7 @@
           </span>
         </div>
       </div>
-      <button class="btn btn-secondary" (click)="logout()">
-        Logout
-      </button>
+      <button class="btn btn-secondary" (click)="logout()">Logout</button>
     </div>
 
     <div class="header-right" *ngIf="!isLoggedIn">

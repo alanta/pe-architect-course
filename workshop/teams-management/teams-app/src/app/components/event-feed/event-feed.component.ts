@@ -44,4 +44,17 @@ export class EventFeedComponent implements OnInit, OnDestroy {
     if (severity === 'warning') return '⚠';
     return 'ℹ';
   }
+
+  // For gatekeeper violations, strip the "Admission webhook ... Message: " prefix.
+  // Falls back to the raw message for other event types.
+  displayMessage(event: Event): string {
+    const match = event.message.match(/,\s*Message:\s*(.+)$/s);
+    return match ? match[1].trim() : event.message;
+  }
+
+  // Extract the webhook/source name from the admission webhook prefix, if present.
+  displaySource(event: Event): string {
+    const match = event.message.match(/Admission webhook "([^"]+)"/);
+    return match ? match[1] : event.event_type;
+  }
 }

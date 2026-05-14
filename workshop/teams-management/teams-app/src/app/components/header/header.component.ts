@@ -63,8 +63,9 @@
 //
 
 // src/app/components/header/header.component.ts
-import { Component, OnInit } from "@angular/core";
+import { Component, OnInit, Output, EventEmitter } from "@angular/core";
 import { AuthService } from "../../services/auth.service";
+import { TeamsService } from "../../services/teams.service";
 import { KeycloakProfile } from "keycloak-js";
 
 @Component({
@@ -73,27 +74,27 @@ import { KeycloakProfile } from "keycloak-js";
   styleUrls: ["./header.component.css"],
 })
 export class HeaderComponent implements OnInit {
+  @Output() teamCreated = new EventEmitter<void>();
+
   userProfile: KeycloakProfile | null = null;
   isLoggedIn = false;
   userRoles: string[] = [];
   isLoading = true;
+  newTeamName = '';
+  isSubmitting = false;
+  createError = '';
 
-  constructor(public authService: AuthService) {}
+  constructor(public authService: AuthService, private teamsService: TeamsService) {}
 
   async ngOnInit() {
     const tokenInfo = this.authService.getUserInfoFromToken();
     console.log(tokenInfo);
 
     try {
-      // Ensure auth state is refreshed
       await this.authService.refreshAuthState();
-
       this.isLoggedIn = this.authService.isLoggedInSync();
-
       if (this.isLoggedIn) {
         try {
-          // this.userProfile = await this.authService.loadUserProfile();
-          // this.userRoles = this.authService.getUserRoles();
           this.userProfile = tokenInfo;
           this.userRoles = tokenInfo.roles;
         } catch (error) {
@@ -105,6 +106,24 @@ export class HeaderComponent implements OnInit {
     } finally {
       this.isLoading = false;
     }
+  }
+
+  createTeam() {
+    const name = this.newTeamName.trim();
+    if (!name || this.isSubmitting) return;
+    this.isSubmitting = true;
+    this.createError = '';
+    this.teamsService.createTeam({ name }).subscribe({
+      next: () => {
+        this.newTeamName = '';
+        this.isSubmitting = false;
+        this.teamCreated.emit();
+      },
+      error: (err) => {
+        this.createError = err;
+        this.isSubmitting = false;
+      }
+    });
   }
 
   async login() {

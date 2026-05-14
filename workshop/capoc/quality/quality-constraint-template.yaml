@@ -11,9 +11,6 @@ spec:
         openAPIV3Schema:
           type: object
           properties:
-            coverageData:
-              type: object
-              description: "Coverage data as key-value pairs"
             minimumCoverage:
               type: number
               default: 80
@@ -22,12 +19,19 @@ spec:
       rego: |
         package codecoverage
 
+        # Read coverage data from the synced ConfigMap in gatekeeper-system
+        coverage_data := data.inventory.namespace["gatekeeper-system"]["v1"]["ConfigMap"]["code-coverage-data"].data
+
+        # Matches both Deployment and Argo Rollout
+        target_kinds := {"Deployment", "Rollout"}
+
         violation[{"msg": msg}] {
-          input.review.object.kind == "Deployment"
+          target_kinds[input.review.object.kind]
           sha := input.review.object.metadata.annotations["commit-sha"]
 
-          # Get coverage from constraint parameters
-          coverage := input.parameters.coverageData[sha]
+          # Get coverage from the ConfigMap (values are strings, convert to number)
+          coverage_str := coverage_data[sha]
+          coverage := to_number(coverage_str)
           minimum := input.parameters.minimumCoverage
 
           coverage < minimum
@@ -35,14 +39,14 @@ spec:
         }
 
         violation[{"msg": msg}] {
-          input.review.object.kind == "Deployment"
+          target_kinds[input.review.object.kind]
           not input.review.object.metadata.annotations["commit-sha"]
           msg := "Missing required annotation: commit-sha"
         }
 
         violation[{"msg": msg}] {
-          input.review.object.kind == "Deployment"
+          target_kinds[input.review.object.kind]
           sha := input.review.object.metadata.annotations["commit-sha"]
-          not input.parameters.coverageData[sha]
-          msg := sprintf("No coverage data found for commit %v", [sha])
+          not coverage_data[sha]
+          msg := sprintf("No coverage data found for commit %v — run build.sh to publish coverage results", [sha])
         }

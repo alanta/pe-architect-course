@@ -1,5 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { AuthService } from './services/auth.service';
+import { TeamListComponent } from './components/team-list/team-list.component';
 
 @Component({
   selector: 'app-root',
@@ -7,6 +8,8 @@ import { AuthService } from './services/auth.service';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit {
+  @ViewChild('teamList') teamList?: TeamListComponent;
+
   isLoggedIn = false;
   isLoading = true;
 
@@ -23,6 +26,10 @@ export class AppComponent implements OnInit {
     } finally {
       this.isLoading = false;
     }
+  }
+
+  onTeamCreated() {
+    this.teamList?.loadTeams();
   }
 
   async login() {
