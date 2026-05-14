@@ -48,3 +48,22 @@ spec:
             name: teams-ui-service
             port:
               number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: teams-api-ingress
+  namespace: teams-api
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: team-api.localhost
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: teams-api-service
+            port:
+              number: 4200

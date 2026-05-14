@@ -10,7 +10,7 @@ metadata:
   annotations:
     commit-sha: 8b514a1cb354
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: teams-ui

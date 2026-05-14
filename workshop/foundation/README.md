@@ -227,6 +227,10 @@ Open Policy Agent (OPA) Gatekeeper provides policy-based control for Kubernetes.
 # Apply Gatekeeper manifests
 kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/release-3.14/deploy/gatekeeper.yaml
 
+# Enable admission denial events (required for the Teams API event watcher)
+kubectl patch deployment gatekeeper-controller-manager -n gatekeeper-system --type=json \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--emit-admission-events"}]'
+
 # Wait for Gatekeeper to be ready
 kubectl wait --for=condition=Ready pod -l control-plane=controller-manager -n gatekeeper-system --timeout=90s
 ```

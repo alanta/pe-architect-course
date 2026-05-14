@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import uuid
@@ -133,7 +134,7 @@ def build_links(event_type: str, namespace: str, resource: str, core_v1) -> list
         if ARGO_ROLLOUTS_BASE_URL:
             links.append({
                 "label": "Argo Rollouts UI",
-                "url": f"{ARGO_ROLLOUTS_BASE_URL}/rollouts/namespace/{namespace}/rollout/{resource}"
+                "url": f"{ARGO_ROLLOUTS_BASE_URL}/rollouts/rollout/{namespace}/{resource}"
             })
         if grafana_url:
             links.append({"label": "Grafana Dashboard", "url": grafana_url})
@@ -297,17 +298,24 @@ def watch_gatekeeper_events():
                 if k8s_event.source and k8s_event.source.component:
                     source_component = k8s_event.source.component
                 reason = k8s_event.reason or ""
-                namespace = k8s_event.metadata.namespace or ""
 
                 if source_component != "gatekeeper" and reason != "FailedAdmission":
                     continue
 
+                involved = k8s_event.involved_object
+                resource_name = involved.name if involved else "unknown"
+                message = k8s_event.message or "Gatekeeper policy violation"
+
+                # Gatekeeper emits events in gatekeeper-system; the affected team
+                # namespace is embedded in the message as "Resource Namespace: <ns>"
+                ns_match = re.search(r"Resource Namespace:\s*([^\s,]+)", message)
+                namespace = (ns_match.group(1) if ns_match
+                             else (involved.namespace if involved and involved.namespace
+                                   else k8s_event.metadata.namespace or ""))
+
                 team_id = resolve_team_id(namespace, core_v1)
                 if not team_id:
                     continue
-
-                involved = k8s_event.involved_object
-                resource_name = involved.name if involved else "unknown"
                 message = k8s_event.message or "Gatekeeper policy violation"
 
                 links = build_links("gatekeeper.violation", namespace, resource_name, core_v1)
@@ -471,6 +479,15 @@ class Event(BaseModel):
     links: List[EventLink]
 
 
+class EventCreate(BaseModel):
+    event_type: str
+    severity: str
+    resource: str
+    namespace: str
+    message: str
+    links: List[EventLink] = []
+
+
 # --- Team CRUD endpoints (task 2.2) ---
 
 @app.get("/")
@@ -587,6 +604,39 @@ async def get_team_events(
         )
         for row in rows
     ]
+
+
+@app.post("/teams/{team_id}/events", response_model=Event, status_code=201)
+async def create_team_event(team_id: str, event: EventCreate):
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cursor = await db.execute(
+            "SELECT id FROM teams WHERE id = ?", (team_id,)
+        )
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Team not found")
+
+        event_id = str(uuid.uuid4())
+        timestamp = datetime.now(timezone.utc).isoformat()
+        links_json = json.dumps([{"label": l.label, "url": l.url} for l in event.links])
+        await db.execute(
+            "INSERT INTO events (id, team_id, event_type, severity, resource, namespace, message, timestamp, links)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (event_id, team_id, event.event_type, event.severity, event.resource,
+             event.namespace, event.message, timestamp, links_json),
+        )
+        await db.commit()
+
+    return Event(
+        id=event_id,
+        team_id=team_id,
+        event_type=event.event_type,
+        severity=event.severity,
+        resource=event.resource,
+        namespace=event.namespace,
+        message=event.message,
+        timestamp=timestamp,
+        links=event.links,
+    )
 
 
 if __name__ == "__main__":
