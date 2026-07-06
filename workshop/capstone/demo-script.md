@@ -3,63 +3,64 @@
 Pre-flight checks are skipped on camera — cluster, Gatekeeper, Argo Rollouts, Keycloak,
 Teams API/UI, and Grafana are already running before recording starts.
 
-## 1. Simulated build pipeline
-- Run `build.sh` for a color variant (e.g. `purple`): builds EmojiApi, runs the .NET test
-  suite + coverage, builds the Docker image, loads it into kind.
-- Call out that the recorded coverage % is later checked by the Gatekeeper quality gate.
-
-## 2. Team creation → propagation
-- `teams_cli.py login` — opens a browser for device login against Keycloak (`teams-cli`
-  client); show the device code prompt and browser sign-in.
-- `teams_cli.py whoami` — confirm the identity/roles picked up from the token.
-- `teams_cli.py create "Platform Engineering"` — call out that this now requires the
+## 1. Team creation → propagation (must come first — deployment targets the team namespace)
+- `teams_cli.py login` as `teamlead1` — opens a browser for device login against Keycloak
+  (`teams-cli` client); show the device code prompt and browser sign-in. We stay logged in
+  as `teamlead1` for the rest of the demo — no admin/team-lead context switching.
+- `teams_cli.py whoami` — confirm the identity/role picked up from the token. Call out
+  this is a role check, not a data-scoping check today: any authenticated
+  `team-leader`/`admin` can create/delete any team; there's no per-team ownership model
+  (yet) — worth naming as a natural next step, not building live.
+- `teams_cli.py create "Pink"` — call out that this now requires the
   `team-leader`/`admin` role, enforced by `teams-api` (a plain unauthenticated `curl
-  POST /teams` would get a 401/403 here — worth showing once for contrast).
-- Show the request hit `teams-api` → operator picks it up → namespace
-  `team-platform-engineering` appears via `kubectl get ns`.
-- Call out: CLI → API → Operator → namespace is the same propagation chain built earlier
-  in the course, now with the create call actually authenticated end-to-end.
+  POST /teams` would get a 401/403 here — worth showing once for contrast). Team name is
+  a color ("Pink") to keep the framing as an implementation team consuming the platform,
+  not the platform team itself — deliberately distinct from the `purple`/`green`/`orange`/
+  `red` emoji-color image variants used later, to avoid confusion between team name and
+  image color.
 
-## 3. Switch to a team member login
-- Log out of the admin/platform view in the Teams UI.
-- Log in as `teamlead1` via Keycloak.
-- Show the scoped view (only their team, `team-leader` role).
-- (CLI equivalent, if wanted for contrast) `teams_cli.py logout` then `teams_cli.py login`
-  as `teamlead1`, `teams_cli.py whoami` to confirm the switch.
+## 2. Demonstrate desired state
+- Switch to the Teams UI portal, log in as `teamlead1`, show the team now listed there.
+- Switch to the VS Code Kubernetes extension: show the `team-pink`
+  namespace appear — the operator reconciling desired state from the API, no manual
+  `kubectl create ns` involved.
+- Call out: CLI → API → Operator → namespace is the propagation chain built earlier in
+  the course, now with the create call authenticated end-to-end.
 
-## 4. Deploy EmojiAPI as that team
-- Run `deploy.sh --team "Platform Engineering" --color purple` (plain `Deployment`) →
+## 3. Deploy EmojiAPI as that team (the actual capstone requirement)
+TODO: explain demo app
+- Run `deploy.sh --team "Pink" --color purple` (plain `Deployment`) →
   **denied** by the `K8sRequireArgoRollout` constraint. Show the kubectl error live.
-- Re-run with `--good` (Argo `Rollout`, canary) → succeeds. Hit `/health` and the emoji
-  endpoint to prove it's live.
+- Show the violations in the [teams ui](http://teams-ui.localhost:8080/)
+- Re-run with `--good` (Argo `Rollout`, canary) → succeeds. 
+- Hit http://team-pink.localhost:8080/ to see the app running
+- Show the app in the [teams ui](http://teams-ui.localhost:8080/)
 
-## 5. Prove Argo Rollouts is real
-- Deploy `--color green`, then `--color orange` as new revisions.
-- Show `kubectl argo rollouts get rollout emoji-api --watch` progressing through the
-  canary steps (50% → pause → promote).
-- Open the Argo Rollouts dashboard: both color pods running side-by-side mid-canary, then
-  promote and show the old color scale down.
+## 4. Prove Argo Rollouts is real
+- Hit http://team-pink.localhost:8080/ to see the app running again
+- In the console deploy `--color green`, then `--color orange` as new revisions. - new color emojies should start showing
+- Open the Argo Rollouts dashboard: http://localhost:3100/rollouts/rollout/team-pink/emoji-api
+  Both color pods running side-by-side mid-canary, then promote and show the old color scale down.
 
-## 6. Quality gate violation (bonus)
-- Deploy `--color red` (deliberately low-coverage demo SHA) → blocked by the
-  `CodeCoverageSimple` constraint. Show the denial message referencing commit SHA and
-  coverage %.
-
-## 7. Platform team view: Grafana violations dashboard
+## 5. Platform team view: Grafana violations dashboard
 - Switch to the security/Gatekeeper Grafana dashboard.
 - Show CVE/quality/Argo-rollout denials logged as metrics — platform team sees violations
   across all teams without touching kubectl.
 
-## 8. Wrap-up
+## 6. Bonus round (extras beyond the requirements)
+- **Simulated build pipeline**: run `build.sh` for a color variant — builds EmojiApi,
+  runs the .NET test suite + coverage, builds the Docker image, loads it into kind. Call
+  out the recorded coverage % feeds the Gatekeeper quality gate.
+- **Quality gate violation**: deploy `--color red` (deliberately low-coverage demo SHA) →
+  blocked by the `CodeCoverageSimple` constraint, denial message references commit SHA
+  and coverage %.
+- **CVE/NuGet scanning**: mention the extended CVE constraint checking both image and
+  package-level (NuGet) CVEs.
+- **SecOps runtime monitoring**: Falco + the custom Grafana security dashboard, if time
+  allows.
+
+## 6. Wrap-up
 - Recap: policy-as-code enforcing Argo Rollouts, quality gates, and CVE scanning;
-  propagation from CLI to namespace; canary color-based verification; Grafana visibility
-  for platform ops.
+  authenticated propagation from CLI to namespace; canary color-based verification;
+  Grafana visibility for platform ops.
 
----
-
-**Open items before this script is final:**
-- Real (non-simulated) build pipeline is postponed; step 1 stays as the "simulated"
-  version for now.
-- CLI login / API auth is implemented (`teams-cli` device flow, `POST/DELETE /teams`
-  protected). Needs a live run-through once Keycloak has picked up the realm/client
-  change to confirm the flow works end-to-end before recording.
