@@ -231,6 +231,20 @@ kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/
 kubectl patch deployment gatekeeper-controller-manager -n gatekeeper-system --type=json \
   -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--emit-admission-events"}]'
 
+# Exclude high-churn system namespaces from admission review (kube-node-lease heartbeats,
+# kube-system leader-election leases/events, local-path-storage). The default webhook
+# reviews every CREATE/UPDATE across the whole cluster, which drowns out real admission
+# activity in the "Admission Requests" Grafana panels with unrelated system noise. The
+# gatekeeper_validation_request_count metric has no per-object namespace label, so this
+# has to be filtered at the webhook, not in the dashboard query.
+kubectl patch validatingwebhookconfiguration gatekeeper-validating-webhook-configuration --type=json -p='[
+  {
+    "op": "replace",
+    "path": "/webhooks/0/namespaceSelector/matchExpressions/1/values",
+    "value": ["gatekeeper-system", "kube-system", "kube-node-lease", "kube-public", "local-path-storage"]
+  }
+]'
+
 # Wait for Gatekeeper to be ready
 kubectl wait --for=condition=Ready pod -l control-plane=controller-manager -n gatekeeper-system --timeout=90s
 ```

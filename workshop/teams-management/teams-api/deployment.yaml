@@ -144,6 +144,9 @@ kind: Service
 metadata:
   name: teams-api-service
   namespace: teams-api
+  labels:
+    app: teams-api
+    release: grafana-stack
 spec:
   selector:
     app: teams-api
@@ -151,7 +154,27 @@ spec:
     - protocol: TCP
       port: 4200
       targetPort: 8000
+      name: http
   type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: teams-api
+  namespace: teams-api
+  labels:
+    release: grafana-stack
+spec:
+  selector:
+    matchLabels:
+      app: teams-api
+  namespaceSelector:
+    matchNames:
+      - teams-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

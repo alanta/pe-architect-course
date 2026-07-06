@@ -14,7 +14,9 @@ import jwt
 import requests
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
 from pydantic import BaseModel, validator
 
 logging.basicConfig(level=logging.INFO)
@@ -87,6 +89,26 @@ def require_write_access(
 
 _stop_event = threading.Event()
 _watcher_threads: list = []
+
+# Gatekeeper exposes no per-constraint label on its own metrics (only allow/deny
+# totals), so we re-expose the per-constraint detail we already parse for the
+# Team Event Feed. These are two different kinds of signal, so two different
+# metric primitives:
+#  - admission denials are discrete "this happened" events (like Falco alerts)
+#    -> Counter, incremented once per FailedAdmission event.
+#  - audit violations are a re-observed snapshot of currently-broken resources,
+#    re-checked every 15s regardless of whether anything new happened
+#    -> Gauge, set to the current count each poll cycle (not incremented).
+GATEKEEPER_ADMISSION_DENIALS = Counter(
+    "teams_api_gatekeeper_admission_denials_total",
+    "Gatekeeper admission-time denials observed, by constraint",
+    ["constraint", "namespace"],
+)
+GATEKEEPER_ACTIVE_VIOLATIONS = Gauge(
+    "teams_api_gatekeeper_active_violations",
+    "Currently active Gatekeeper audit violations, by constraint",
+    ["constraint", "kind", "namespace"],
+)
 
 
 # --- Database helpers ---
@@ -380,6 +402,15 @@ def watch_gatekeeper_events():
                     continue
                 message = k8s_event.message or "Gatekeeper policy violation"
 
+                # Admission-deny events emitted with --emit-admission-events look like
+                # "...denied request, Resource Namespace: <ns>, Constraint: <name>, Message: ..."
+                # (one FailedAdmission event per violated constraint).
+                constraint_match = re.search(r"Constraint:\s*([^\s,]+)", message)
+                if constraint_match:
+                    GATEKEEPER_ADMISSION_DENIALS.labels(
+                        constraint=constraint_match.group(1), namespace=namespace
+                    ).inc()
+
                 links = build_links("gatekeeper.violation", namespace, resource_name, core_v1)
                 _sync_write_event(
                     team_id=team_id,
@@ -414,6 +445,11 @@ def poll_gatekeeper_constraints():
             ]
 
             seen_violations: set = set()
+            # Snapshot of current violation counts this poll cycle, keyed by
+            # (constraint, kind, namespace) -> count. The Gauge is repopulated
+            # from this each cycle so it reflects "currently broken", not
+            # "how many times we've polled while broken".
+            active_counts: Dict[tuple, int] = {}
 
             for crd in constraint_crds:
                 group = crd.spec.group
@@ -425,7 +461,9 @@ def poll_gatekeeper_constraints():
                     constraints = custom_api.list_cluster_custom_object(
                         group=group, version=version, plural=plural
                     )
+                    kind = crd.spec.names.kind
                     for constraint in constraints.get("items", []):
+                        constraint_instance_name = constraint.get("metadata", {}).get("name", constraint_name)
                         violations = constraint.get("status", {}).get("violations") or []
                         for violation in violations:
                             namespace = violation.get("namespace", "")
@@ -438,6 +476,9 @@ def poll_gatekeeper_constraints():
 
                             resource_name = violation.get("name", "unknown")
                             message = violation.get("message", "Gatekeeper policy violation")
+
+                            gauge_key = (constraint_instance_name, kind, namespace)
+                            active_counts[gauge_key] = active_counts.get(gauge_key, 0) + 1
 
                             key = f"{constraint_name}/{namespace}/{resource_name}"
                             if key in seen_violations:
@@ -456,6 +497,14 @@ def poll_gatekeeper_constraints():
                             )
                 except Exception as e:
                     logger.warning(f"Error polling constraint {plural}: {e}")
+
+            # Repopulate the gauge from scratch so resolved violations drop back to 0
+            # instead of the label combo staying stuck at whatever it last was.
+            GATEKEEPER_ACTIVE_VIOLATIONS.clear()
+            for (constraint_instance_name, kind, namespace), count in active_counts.items():
+                GATEKEEPER_ACTIVE_VIOLATIONS.labels(
+                    constraint=constraint_instance_name, kind=kind, namespace=namespace
+                ).set(count)
 
         except Exception as e:
             logger.error(f"Gatekeeper constraint poll error: {e}")
@@ -611,6 +660,14 @@ async def delete_team(team_id: str, _claims: dict = Depends(require_write_access
         await db.execute("DELETE FROM teams WHERE id = ?", (team_id,))
         await db.commit()
     return {"message": f"Team '{row['name']}' deleted successfully"}
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus scrape endpoint: exposes per-constraint violation counts
+    (Gatekeeper's own metrics have no per-rule label, see
+    GATEKEEPER_ADMISSION_DENIALS and GATEKEEPER_ACTIVE_VIOLATIONS)."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/health")

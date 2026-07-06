@@ -232,33 +232,16 @@ data:
           "fieldConfig": {
             "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 }, "unit": "short" }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
-          "id": 11,
+          "gridPos": { "h": 8, "w": 14, "x": 0, "y": 22 },
+          "id": 14,
           "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
           "targets": [
             {
-              "expr": "sum by(admission_status) (rate(gatekeeper_validation_request_count[5m]))",
-              "legendFormat": "{{admission_status}}"
+              "expr": "sum by(constraint, exported_namespace) (rate(teams_api_gatekeeper_admission_denials_total[5m]))",
+              "legendFormat": "{{constraint}} ({{exported_namespace}})"
             }
           ],
-          "title": "Admission Request Rate by Status (5m)",
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": {
-            "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 }, "unit": "short" }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
-          "id": 12,
-          "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
-          "targets": [
-            {
-              "expr": "sum by(admission_status) (increase(gatekeeper_validation_request_count[1h]))",
-              "legendFormat": "{{admission_status}}"
-            }
-          ],
-          "title": "Admission Requests by Status (1h)",
+          "title": "Gatekeeper Admission Denials by Rule (5m)",
           "type": "timeseries"
         },
         {
@@ -266,25 +249,26 @@ data:
           "fieldConfig": {
             "defaults": { "unit": "short" },
             "overrides": [
-              { "matcher": { "id": "byName", "options": "Enforcement" }, "properties": [{ "id": "custom.width", "value": 120 }] },
-              { "matcher": { "id": "byName", "options": "Constraint" }, "properties": [{ "id": "custom.width", "value": 200 }] },
-              { "matcher": { "id": "byName", "options": "Violations" }, "properties": [{ "id": "custom.width", "value": 100 }, { "id": "color", "value": { "mode": "thresholds" } }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] } }] }
+              { "matcher": { "id": "byName", "options": "Constraint" }, "properties": [{ "id": "custom.width", "value": 260 }] },
+              { "matcher": { "id": "byName", "options": "Kind" }, "properties": [{ "id": "custom.width", "value": 180 }] },
+              { "matcher": { "id": "byName", "options": "Namespace" }, "properties": [{ "id": "custom.width", "value": 160 }] },
+              { "matcher": { "id": "byName", "options": "Count" }, "properties": [{ "id": "color", "value": { "mode": "thresholds" } }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] } }] }
             ]
           },
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 30 },
-          "id": 13,
-          "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Violations" }] },
+          "id": 16,
+          "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Count" }] },
           "targets": [
             {
-              "expr": "sort_desc(sum by(admission_status) (gatekeeper_validation_request_count))",
+              "expr": "sort_desc(sum by(constraint, kind, exported_namespace) (teams_api_gatekeeper_active_violations))",
               "format": "table",
               "instant": true,
               "legendFormat": ""
             }
           ],
-          "title": "Admission Requests by Status",
+          "title": "Currently Active Violations by Rule",
           "transformations": [
-            { "id": "organize", "options": { "renameByName": { "admission_status": "Status", "Value": "Count" } } }
+            { "id": "organize", "options": { "renameByName": { "constraint": "Constraint", "kind": "Kind", "exported_namespace": "Namespace", "Value": "Count" } } }
           ],
           "type": "table"
         }
