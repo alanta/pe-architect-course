@@ -15,6 +15,13 @@ RUN dotnet test EmojiApi.Tests/EmojiApi.Tests.csproj \
 # Print the overall line-rate as an integer percentage (e.g. "87")
 CMD ["sh", "-c", "grep -m1 'line-rate=' /testresults/*/coverage.cobertura.xml | awk -F'\"' '{printf \"%d\\n\", $2 * 100}'"]
 
+# Vulnerability check stage — CMD outputs dotnet list package JSON to stdout
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS vuln-check
+WORKDIR /src
+COPY EmojiApi/EmojiApi.csproj EmojiApi/
+RUN dotnet restore EmojiApi/EmojiApi.csproj
+CMD ["dotnet", "list", "EmojiApi/EmojiApi.csproj", "package", "--vulnerable", "--include-transitive", "--format", "json"]
+
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
