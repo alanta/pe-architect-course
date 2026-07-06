@@ -103,6 +103,22 @@ data:
           "attributes": {
             "post.logout.redirect.uris": "http://platform-auth.localhost:8080/*##http://teams-ui.localhost:8080/*##http://localhost:4200/*"
           }
+        },
+        {
+          "clientId": "teams-cli",
+          "name": "Teams CLI",
+          "description": "Device-flow login for the teams_cli.py tool",
+          "enabled": true,
+          "publicClient": true,
+          "protocol": "openid-connect",
+          "standardFlowEnabled": false,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "attributes": {
+            "oauth2.device.authorization.grant.enabled": "true",
+            "access.token.lifespan": "3600"
+          }
         }
       ],
       "users": [

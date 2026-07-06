@@ -104,6 +104,10 @@ spec:
           value: "/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-workloads"
         - name: ARGO_ROLLOUTS_BASE_URL
           value: "http://localhost:3100"
+        - name: KEYCLOAK_JWKS_URL
+          value: "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/teams/protocol/openid-connect/certs"
+        - name: KEYCLOAK_ISSUER
+          value: "http://platform-auth.localhost:8080/realms/teams"
         securityContext:
           runAsNonRoot: true
           runAsUser: 1001

@@ -7,11 +7,14 @@ import threading
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiosqlite
-from fastapi import FastAPI, HTTPException, Query
+import jwt
+import requests
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, validator
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +25,65 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "/data/teams.db")
 GRAFANA_BASE_URL = os.getenv("GRAFANA_BASE_URL", "")
 GRAFANA_DASHBOARD_PATH = os.getenv("GRAFANA_DASHBOARD_PATH", "")
 ARGO_ROLLOUTS_BASE_URL = os.getenv("ARGO_ROLLOUTS_BASE_URL", "")
+
+# --- Auth configuration ---
+# JWKS is fetched from the in-cluster Keycloak service; the issuer is validated
+# against the externally-facing hostname (KC_HOSTNAME), since that's what Keycloak
+# stamps into the "iss" claim regardless of which URL was used to reach it.
+KEYCLOAK_JWKS_URL = os.getenv(
+    "KEYCLOAK_JWKS_URL",
+    "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/teams/protocol/openid-connect/certs",
+)
+KEYCLOAK_ISSUER = os.getenv("KEYCLOAK_ISSUER", "http://platform-auth.localhost:8080/realms/teams")
+WRITE_ROLES = {"team-leader", "admin"}
+
+_bearer_scheme = HTTPBearer(auto_error=False)
+_jwks_cache: Dict[str, Any] = {}
+
+
+def _get_signing_key(kid: str):
+    """Fetch (and cache) the JWKS from Keycloak, returning the public key for `kid`."""
+    if kid not in _jwks_cache:
+        try:
+            resp = requests.get(KEYCLOAK_JWKS_URL, timeout=5)
+            resp.raise_for_status()
+            for jwk in resp.json().get("keys", []):
+                _jwks_cache[jwk["kid"]] = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Could not fetch JWKS from Keycloak: {e}")
+            raise HTTPException(status_code=503, detail="Auth service unavailable")
+    if kid not in _jwks_cache:
+        raise HTTPException(status_code=401, detail="Unknown signing key")
+    return _jwks_cache[kid]
+
+
+def require_write_access(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+):
+    """Dependency for mutating routes: requires a valid Keycloak token with the
+    'team-leader' or 'admin' realm role. Read-only routes stay anonymous."""
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+
+    token = credentials.credentials
+    try:
+        header = jwt.get_unverified_header(token)
+        key = _get_signing_key(header["kid"])
+        payload = jwt.decode(
+            token,
+            key=key,
+            algorithms=["RS256"],
+            issuer=KEYCLOAK_ISSUER,
+            options={"verify_aud": False},
+        )
+    except jwt.PyJWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+
+    roles = set(payload.get("realm_access", {}).get("roles", []))
+    if not roles & WRITE_ROLES:
+        raise HTTPException(status_code=403, detail="team-leader or admin role required")
+
+    return payload
 
 _stop_event = threading.Event()
 _watcher_threads: list = []
@@ -497,7 +559,7 @@ async def root():
 
 
 @app.post("/teams", response_model=Team, status_code=201)
-async def create_team(team: TeamCreate):
+async def create_team(team: TeamCreate, _claims: dict = Depends(require_write_access)):
     team_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(DATABASE_PATH) as db:
@@ -537,7 +599,7 @@ async def get_team(team_id: str):
 
 
 @app.delete("/teams/{team_id}")
-async def delete_team(team_id: str):
+async def delete_team(team_id: str, _claims: dict = Depends(require_write_access)):
     async with aiosqlite.connect(DATABASE_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(

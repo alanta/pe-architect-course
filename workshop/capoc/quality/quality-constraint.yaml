@@ -16,5 +16,6 @@ spec:
       - "gatekeeper-system"
       - "engineering-platform"
       - "teams-api"
+      - "keycloak"
   parameters:
     minimumCoverage: 80
