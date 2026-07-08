@@ -26,3 +26,30 @@ export interface Event {
   links: EventLink[];
   count: number;
 }
+
+export interface TeamDeployment {
+  workload_type?: 'deployment' | 'rollout';
+  name: string;
+  namespace: string;
+  replicas: number;
+  available_replicas: number;
+  updated_replicas: number;
+  stable_replicas?: number;
+  rollout_phase?: string;
+  rollout_step?: string;
+  created_at?: string;
+}
+
+export interface PolicyViolation {
+  constraint: string;
+  kind: string;
+  namespace: string;
+  resource: string;
+  message: string;
+}
+
+export interface TeamPolicyStatus {
+  in_violation: boolean;
+  checked_at: string;
+  violations: PolicyViolation[];
+}

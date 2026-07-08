@@ -368,6 +368,12 @@ def watch_gatekeeper_events():
     _load_k8s_config()
     core_v1 = client.CoreV1Api()
 
+    # Persists across reconnects (the for-loop below restarts every ~60s on
+    # timeout, and a watch with no starting resourceVersion replays every
+    # currently-existing Event as a synthetic ADDED). Without this, every
+    # reconnect would re-count every still-unexpired FailedAdmission event.
+    seen_event_versions: Dict[str, str] = {}
+
     logger.info("Starting gatekeeper events watcher")
     while not _stop_event.is_set():
         try:
@@ -385,6 +391,12 @@ def watch_gatekeeper_events():
 
                 if source_component != "gatekeeper" and reason != "FailedAdmission":
                     continue
+
+                event_uid = k8s_event.metadata.uid
+                event_rv = k8s_event.metadata.resource_version
+                if seen_event_versions.get(event_uid) == event_rv:
+                    continue
+                seen_event_versions[event_uid] = event_rv
 
                 involved = k8s_event.involved_object
                 resource_name = involved.name if involved else "unknown"
@@ -591,6 +603,33 @@ class Event(BaseModel):
     count: int = 1
 
 
+class TeamDeployment(BaseModel):
+    workload_type: str = "deployment"
+    name: str
+    namespace: str
+    replicas: int
+    available_replicas: int
+    updated_replicas: int
+    stable_replicas: Optional[int] = None
+    rollout_phase: Optional[str] = None
+    rollout_step: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class PolicyViolation(BaseModel):
+    constraint: str
+    kind: str
+    namespace: str
+    resource: str
+    message: str
+
+
+class TeamPolicyStatus(BaseModel):
+    in_violation: bool
+    checked_at: datetime
+    violations: List[PolicyViolation]
+
+
 class EventCreate(BaseModel):
     event_type: str
     severity: str
@@ -678,6 +717,201 @@ async def health_check():
         row = await cursor.fetchone()
         count = row[0] if row else 0
     return {"status": "healthy", "teams_count": count}
+
+
+@app.get("/teams/{team_id}/deployments", response_model=List[TeamDeployment])
+async def get_team_deployments(team_id: str):
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cursor = await db.execute(
+            "SELECT id FROM teams WHERE id = ?", (team_id,)
+        )
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Team not found")
+
+    try:
+        from kubernetes import client
+
+        _load_k8s_config()
+        core_v1 = client.CoreV1Api()
+        apps_v1 = client.AppsV1Api()
+        custom_api = client.CustomObjectsApi()
+
+        namespaces = core_v1.list_namespace(
+            label_selector=f"teams.example.com/team-id={team_id}"
+        )
+
+        deployments: List[TeamDeployment] = []
+        for ns in namespaces.items:
+            namespace = ns.metadata.name
+            deployment_list = apps_v1.list_namespaced_deployment(namespace=namespace)
+
+            for deployment in deployment_list.items:
+                spec_replicas = deployment.spec.replicas or 0
+                status = deployment.status
+                available_replicas = status.available_replicas or 0
+                updated_replicas = status.updated_replicas or 0
+
+                # "Running" means at least one replica is currently available.
+                if available_replicas < 1:
+                    continue
+
+                deployments.append(
+                    TeamDeployment(
+                        workload_type="deployment",
+                        name=deployment.metadata.name,
+                        namespace=namespace,
+                        replicas=spec_replicas,
+                        available_replicas=available_replicas,
+                        updated_replicas=updated_replicas,
+                        stable_replicas=max(spec_replicas - updated_replicas, 0),
+                        created_at=deployment.metadata.creation_timestamp,
+                    )
+                )
+
+            # Include Argo Rollouts as deployment-like cards when the CRD exists.
+            try:
+                rollouts = custom_api.list_namespaced_custom_object(
+                    group="argoproj.io",
+                    version="v1alpha1",
+                    namespace=namespace,
+                    plural="rollouts",
+                )
+                for rollout in rollouts.get("items", []):
+                    status = rollout.get("status", {})
+                    spec = rollout.get("spec", {})
+
+                    replicas = int(spec.get("replicas", 1) or 0)
+                    available_replicas = int(status.get("availableReplicas", 0) or 0)
+                    updated_replicas = int(status.get("updatedReplicas", 0) or 0)
+                    status_replicas = int(status.get("replicas", replicas) or 0)
+                    phase = (status.get("phase") or "").lower()
+                    stable_replicas = max(status_replicas - updated_replicas, 0)
+
+                    canary_steps = (spec.get("strategy", {})
+                                      .get("canary", {})
+                                      .get("steps", []))
+                    current_step_index = int(status.get("currentStepIndex", 0) or 0)
+                    step_total = len(canary_steps)
+                    step_display = None
+                    if step_total > 0:
+                        # Convert from 0-based index to human-readable step number.
+                        step_display = f"{min(current_step_index + 1, step_total)}/{step_total}"
+
+                    # Treat healthy/progressing rollouts with available pods as running.
+                    if available_replicas < 1 and phase not in {"healthy", "progressing"}:
+                        continue
+
+                    created_at = rollout.get("metadata", {}).get("creationTimestamp")
+                    deployments.append(
+                        TeamDeployment(
+                            workload_type="rollout",
+                            name=rollout.get("metadata", {}).get("name", "unknown"),
+                            namespace=namespace,
+                            replicas=replicas,
+                            available_replicas=available_replicas,
+                            updated_replicas=updated_replicas,
+                            stable_replicas=stable_replicas,
+                            rollout_phase=phase or None,
+                            rollout_step=step_display,
+                            created_at=created_at,
+                        )
+                    )
+            except Exception as rollout_err:
+                logger.debug(f"Unable to list rollouts in namespace {namespace}: {rollout_err}")
+
+        deployments.sort(
+            key=lambda item: (item.namespace.lower(), item.name.lower())
+        )
+        return deployments
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Unable to list deployments for team {team_id}: {e}")
+        return []
+
+
+@app.get("/teams/{team_id}/policy-status", response_model=TeamPolicyStatus)
+async def get_team_policy_status(team_id: str):
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cursor = await db.execute(
+            "SELECT id FROM teams WHERE id = ?", (team_id,)
+        )
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Team not found")
+
+    try:
+        from kubernetes import client
+
+        _load_k8s_config()
+        core_v1 = client.CoreV1Api()
+        custom_api = client.CustomObjectsApi()
+        ext_api = client.ApiextensionsV1Api()
+
+        namespaces = core_v1.list_namespace(
+            label_selector=f"teams.example.com/team-id={team_id}"
+        )
+        team_namespaces = {ns.metadata.name for ns in namespaces.items if ns.metadata and ns.metadata.name}
+
+        if not team_namespaces:
+            return TeamPolicyStatus(
+                in_violation=False,
+                checked_at=datetime.now(timezone.utc),
+                violations=[],
+            )
+
+        violations: List[PolicyViolation] = []
+
+        crds = ext_api.list_custom_resource_definition()
+        constraint_crds = [
+            crd for crd in crds.items
+            if "constraints.gatekeeper.sh" in (crd.spec.group or "")
+        ]
+
+        for crd in constraint_crds:
+            group = crd.spec.group
+            served_versions = [v.name for v in (crd.spec.versions or []) if getattr(v, "served", False)]
+            version = served_versions[0] if served_versions else "v1beta1"
+            plural = crd.spec.names.plural
+            kind = crd.spec.names.kind
+
+            try:
+                constraints = custom_api.list_cluster_custom_object(
+                    group=group, version=version, plural=plural
+                )
+            except Exception as e:
+                logger.debug(f"Unable to list constraint objects for {plural}: {e}")
+                continue
+
+            for constraint in constraints.get("items", []):
+                constraint_name = constraint.get("metadata", {}).get("name", "unknown")
+                for violation in (constraint.get("status", {}).get("violations") or []):
+                    namespace = violation.get("namespace", "")
+                    if namespace not in team_namespaces:
+                        continue
+                    violations.append(
+                        PolicyViolation(
+                            constraint=constraint_name,
+                            kind=kind,
+                            namespace=namespace,
+                            resource=violation.get("name", "unknown"),
+                            message=violation.get("message", "Gatekeeper policy violation"),
+                        )
+                    )
+
+        return TeamPolicyStatus(
+            in_violation=len(violations) > 0,
+            checked_at=datetime.now(timezone.utc),
+            violations=violations,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Unable to read policy status for team {team_id}: {e}")
+        return TeamPolicyStatus(
+            in_violation=False,
+            checked_at=datetime.now(timezone.utc),
+            violations=[],
+        )
 
 
 # --- Events API endpoint (tasks 8.1, 8.2) ---

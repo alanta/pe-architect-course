@@ -1,3 +1,45 @@
+<div class="deployment-feed" *ngIf="deployments.length > 0">
+  <h4 class="event-feed-title">Running Deployments</h4>
+  <div class="deployment-grid">
+    <article class="deployment-card" *ngFor="let deployment of deployments">
+      <div class="deployment-card-header">
+        <span class="deployment-name">{{ deployment.name }}</span>
+        <span class="deployment-status" [ngClass]="deploymentStatusClass(deployment)">
+          {{ deploymentStatusLabel(deployment) }}
+        </span>
+      </div>
+      <div class="deployment-kind" *ngIf="deployment.workload_type === 'rollout'">Argo Rollout</div>
+      <div class="deployment-meta">Namespace: {{ deployment.namespace }}</div>
+      <div class="deployment-meta">Replicas: {{ deploymentReplicas(deployment) }}</div>
+      <div class="deployment-meta" *ngIf="deployment.workload_type === 'rollout'">
+        Phase: {{ titleCase(deployment.rollout_phase) }}
+      </div>
+      <div class="deployment-meta" *ngIf="deployment.workload_type === 'rollout' && deployment.rollout_step">
+        Step: {{ deployment.rollout_step }}
+      </div>
+      <div class="deployment-meta" *ngIf="deployment.workload_type === 'rollout'">
+        Pods (new/stable): {{ rolloutPodsLabel(deployment) }}
+      </div>
+      <div class="deployment-meta" *ngIf="deployment.workload_type !== 'rollout'">
+        Updated: {{ deployment.updated_replicas }}
+      </div>
+      <div class="deployment-meta">Created: {{ formatDeploymentTime(deployment.created_at) }}</div>
+    </article>
+  </div>
+</div>
+
+<div class="policy-feed" *ngIf="policyStatus">
+  <h4 class="event-feed-title">Policy Status</h4>
+  <div class="policy-state" [class.policy-violating]="policyStatus.in_violation" [class.policy-ok]="!policyStatus.in_violation">
+    {{ policyStateLabel() }}
+  </div>
+  <ul class="policy-violations" *ngIf="policyStatus.in_violation">
+    <li *ngFor="let violation of policyStatus.violations | slice:0:3">
+      {{ violation.constraint }} · {{ violation.resource }} · {{ violation.namespace }}
+    </li>
+  </ul>
+</div>
+
 <!-- event feed: last 5 events for a team -->
 <div class="event-feed" *ngIf="events.length > 0">
   <h4 class="event-feed-title">Recent Events</h4>

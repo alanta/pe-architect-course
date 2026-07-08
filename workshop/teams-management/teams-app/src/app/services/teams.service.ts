@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { Team, TeamCreate, Event } from '../models/team.model';
+import { Team, TeamCreate, Event, TeamDeployment, TeamPolicyStatus } from '../models/team.model';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 
@@ -45,6 +45,18 @@ export class TeamsService {
   getTeamEvents(teamId: string, limit: number = 5): Observable<Event[]> {
     const url = `${this.apiUrl}/teams/${teamId}/events?limit=${limit}`;
     return this.http.get<Event[]>(url)
+      .pipe(catchError(this.handleError));
+  }
+
+  getTeamDeployments(teamId: string): Observable<TeamDeployment[]> {
+    const url = `${this.apiUrl}/teams/${teamId}/deployments`;
+    return this.http.get<TeamDeployment[]>(url)
+      .pipe(catchError(this.handleError));
+  }
+
+  getTeamPolicyStatus(teamId: string): Observable<TeamPolicyStatus> {
+    const url = `${this.apiUrl}/teams/${teamId}/policy-status`;
+    return this.http.get<TeamPolicyStatus>(url)
       .pipe(catchError(this.handleError));
   }
 
