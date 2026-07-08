@@ -230,18 +230,45 @@ data:
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
-            "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 }, "unit": "short" }
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "bars", "barAlignment": 0, "fillOpacity": 80, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } },
+              "unit": "short"
+            }
           },
-          "gridPos": { "h": 8, "w": 14, "x": 0, "y": 22 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
           "id": 14,
           "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
           "targets": [
             {
-              "expr": "sum by(constraint, exported_namespace) (rate(teams_api_gatekeeper_admission_denials_total[5m]))",
-              "legendFormat": "{{constraint}} ({{exported_namespace}})"
+              "expr": "sum by(constraint) (increase(teams_api_gatekeeper_admission_denials_total[5m]))",
+              "legendFormat": "{{constraint}}",
+              "interval": "5m"
             }
           ],
-          "title": "Gatekeeper Admission Denials by Rule (5m)",
+          "title": "Admission Denials per 5m Bucket, by Rule",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "bars", "barAlignment": 0, "fillOpacity": 80, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } },
+              "unit": "short"
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+          "id": 18,
+          "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "expr": "sum by(exported_namespace) (increase(teams_api_gatekeeper_admission_denials_total[5m]))",
+              "legendFormat": "{{exported_namespace}}",
+              "interval": "5m"
+            }
+          ],
+          "title": "Admission Denials per 5m Bucket, by Team",
           "type": "timeseries"
         },
         {
