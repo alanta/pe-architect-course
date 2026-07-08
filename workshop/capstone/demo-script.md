@@ -1,9 +1,21 @@
 # Capstone Demo Script (preliminary)
 
+## 0. Preparation
+
 Pre-flight checks are skipped on camera — cluster, Gatekeeper, Argo Rollouts, Keycloak,
 Teams API/UI, and Grafana are already running before recording starts.
 
+- Purge images from Kind / Docker
+- Purge coverage data for current commit
+- Purhe team-cli credentials
+
+
+## Intro
+
 ## 1. Team creation → propagation (must come first — deployment targets the team namespace)
+
+Complete team creation flow using CLI and API with authentication, triggering operator and shown in 
+
 - `teams_cli.py login` as `teamlead1` — opens a browser for device login against Keycloak
   (`teams-cli` client); show the device code prompt and browser sign-in. We stay logged in
   as `teamlead1` for the rest of the demo — no admin/team-lead context switching.
@@ -22,13 +34,12 @@ Teams API/UI, and Grafana are already running before recording starts.
 ## 2. Demonstrate desired state
 - Switch to the Teams UI portal, log in as `teamlead1`, show the team now listed there.
 - Switch to the VS Code Kubernetes extension: show the `team-pink`
-  namespace appear — the operator reconciling desired state from the API, no manual
-  `kubectl create ns` involved.
+  namespace appear
 - Call out: CLI → API → Operator → namespace is the propagation chain built earlier in
   the course, now with the create call authenticated end-to-end.
 
 ## 3. Deploy EmojiAPI as that team (the actual capstone requirement)
-TODO: explain demo app
+- Explain demo app
 - Run `deploy.sh --team "Pink" --color purple` (plain `Deployment`) →
   **denied** by the `K8sRequireArgoRollout` constraint. Show the kubectl error live.
 - Show the violations in the [teams ui](http://teams-ui.localhost:8080/)
